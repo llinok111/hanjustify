@@ -1,4 +1,4 @@
-/*global Typeset.linebreak*/
+/*global Typeset.linebreak, Hypher*/
 
 /*!
  * Knuth and Plass line breaking algorithm in JavaScript
@@ -8,50 +8,55 @@
  * All rights reserved.
  */
 Typeset.formatter = function (measureText, options) {
-	var linebreak = Typeset.linebreak;
+    const linebreak = Typeset.linebreak;
+    const spaceDefaults = Typeset.formatter.defaults.space;
+    const spaceOptions = options?.space ?? spaceDefaults;
 
     function splitWords(text) {
         return text.match(/\S+/g) || [];
     }
 
-    var spaceWidth = measureText(' '),
-        o = {
-            space: {
-                width: options && options.space.width || 3,
-                stretch: options && options.space.stretch || 6,
-                shrink: options && options.space.shrink || 9
+    const spaceWidth = measureText(' ');
+    const spaceStretch = (spaceWidth * spaceOptions.width) / spaceOptions.stretch;
+    const spaceShrink = (spaceWidth * spaceOptions.width) / spaceOptions.shrink;
+    const h = new Hypher(Hypher.en);
+    const hyphenWidth = measureText('-');
+    const hyphenPenalty = 100;
+
+    function pushWord(nodes, word) {
+        const hyphenated = h.hyphenate(word);
+
+        if (hyphenated.length > 1 && word.length > 4) {
+            for (let partIndex = 0; partIndex < hyphenated.length; partIndex += 1) {
+                const part = hyphenated[partIndex];
+                nodes.push(linebreak.box(measureText(part), part));
+                if (partIndex !== hyphenated.length - 1) {
+                    nodes.push(linebreak.penalty(hyphenWidth, hyphenPenalty, 1));
+                }
             }
-        },
-        h = new Hypher(Hypher.en),
-        hyphenWidth = measureText('-'),
-        hyphenPenalty = 100;
+        } else {
+            nodes.push(linebreak.box(measureText(word), word));
+        }
+    }
+
+    function pushWords(nodes, words, afterWord) {
+        for (let index = 0; index < words.length; index += 1) {
+            pushWord(nodes, words[index]);
+            afterWord(nodes, index, words);
+        }
+    }
 
     return {
-        center: function (text) {
-            var nodes = [],
-            words = splitWords(text),
-            spaceStretch = (spaceWidth * o.space.width) / o.space.stretch,
-            spaceShrink = (spaceWidth * o.space.width) / o.space.shrink;
+        center(text) {
+            const nodes = [];
 
             // Although not specified in the Knuth and Plass whitepaper, this box is necessary
             // to keep the glue from disappearing.
             nodes.push(linebreak.box(0, ''));
             nodes.push(linebreak.glue(0, 12, 0));
 
-            words.forEach(function (word, index, array) {
-                var hyphenated = h.hyphenate(word);
-                if (hyphenated.length > 1 && word.length > 4) {
-                    hyphenated.forEach(function (part, partIndex, partArray) {
-                        nodes.push(linebreak.box(measureText(part), part));
-                        if (partIndex !== partArray.length - 1) {
-                            nodes.push(linebreak.penalty(hyphenWidth, hyphenPenalty, 1));
-                        }
-                    });
-                } else {
-                    nodes.push(linebreak.box(measureText(word), word));
-                }
-
-                if (index === array.length - 1) {
+            pushWords(nodes, splitWords(text), (nodes, index, words) => {
+                if (index === words.length - 1) {
                     nodes.push(linebreak.glue(0, 12, 0));
                     nodes.push(linebreak.penalty(0, -linebreak.infinity, 0));
                 } else {
@@ -63,55 +68,28 @@ Typeset.formatter = function (measureText, options) {
                     nodes.push(linebreak.glue(0, 12, 0));
                 }
             });
+
             return nodes;
         },
-        justify: function (text) {
-            var nodes = [],
-            words = splitWords(text),
-            spaceStretch = (spaceWidth * o.space.width) / o.space.stretch,
-            spaceShrink = (spaceWidth * o.space.width) / o.space.shrink;
+        justify(text) {
+            const nodes = [];
 
-            words.forEach(function (word, index, array) {
-                var hyphenated = h.hyphenate(word);
-                if (hyphenated.length > 1 && word.length > 4) {
-                    hyphenated.forEach(function (part, partIndex, partArray) {
-                        nodes.push(linebreak.box(measureText(part), part));
-                        if (partIndex !== partArray.length - 1) {
-                            nodes.push(linebreak.penalty(hyphenWidth, hyphenPenalty, 1));
-                        }
-                    });
-                } else {
-                    nodes.push(linebreak.box(measureText(word), word));
-                }
-                if (index === array.length - 1) {
+            pushWords(nodes, splitWords(text), (nodes, index, words) => {
+                if (index === words.length - 1) {
                     nodes.push(linebreak.glue(0, linebreak.infinity, 0));
                     nodes.push(linebreak.penalty(0, -linebreak.infinity, 1));
                 } else {
                     nodes.push(linebreak.glue(spaceWidth, spaceStretch, spaceShrink));
                 }
             });
+
             return nodes;
         },
-        left: function (text) {
-            var nodes = [],
-            words = splitWords(text),
-            spaceStretch = (spaceWidth * o.space.width) / o.space.stretch,
-            spaceShrink = (spaceWidth * o.space.width) / o.space.shrink;
+        left(text) {
+            const nodes = [];
 
-            words.forEach(function (word, index, array) {
-                var hyphenated = h.hyphenate(word);
-                if (hyphenated.length > 1 && word.length > 4) {
-                    hyphenated.forEach(function (part, partIndex, partArray) {
-                        nodes.push(linebreak.box(measureText(part), part));
-                        if (partIndex !== partArray.length - 1) {
-                            nodes.push(linebreak.penalty(hyphenWidth, hyphenPenalty, 1));
-                        }
-                    });
-                } else {
-                    nodes.push(linebreak.box(measureText(word), word));
-                }
-
-                if (index === array.length - 1) {
+            pushWords(nodes, splitWords(text), (nodes, index, words) => {
+                if (index === words.length - 1) {
                     nodes.push(linebreak.glue(0, linebreak.infinity, 0));
                     nodes.push(linebreak.penalty(0, -linebreak.infinity, 1));
                 } else {
@@ -120,6 +98,7 @@ Typeset.formatter = function (measureText, options) {
                     nodes.push(linebreak.glue(spaceWidth, -12, 0));
                 }
             });
+
             return nodes;
         }
     };

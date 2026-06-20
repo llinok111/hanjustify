@@ -1,104 +1,104 @@
-if ("undefined" === typeof Typeset) {
+if (typeof Typeset === 'undefined') {
     var Typeset = {};
 }
 
-Typeset.LinkedList = (function(undefined) {
-
-    function LinkedList() {
-        this.head = null;
-        this.tail = null;
-        this.listSize = 0;
-    };
-
-    LinkedList.Node = function (data) {
+class LinkedListNode {
+    constructor(data) {
         this.prev = null;
         this.next = null;
         this.data = data;
-    };
+    }
 
-    LinkedList.Node.prototype.toString = function () {
+    toString() {
         return this.data.toString();
-    };
+    }
+}
 
-    LinkedList.prototype.isLinked = function (node) {
+class LinkedList {
+    constructor() {
+        this.head = null;
+        this.tail = null;
+        this.listSize = 0;
+    }
+
+    *[Symbol.iterator]() {
+        let node = this.head;
+        while (node !== null) {
+            yield node;
+            node = node.next;
+        }
+    }
+
+    isLinked(node) {
         if (!node || this.isEmpty()) {
             return false;
         }
         return !(node.prev === null && node.next === null && this.tail !== node && this.head !== node);
-    };
+    }
 
-    LinkedList.prototype.size = function () {
+    size() {
         return this.listSize;
-    };
+    }
 
-    LinkedList.prototype.isEmpty = function () {
+    isEmpty() {
         return this.listSize === 0;
-    };
+    }
 
-    LinkedList.prototype.first = function () {
+    first() {
         return this.head;
-    };
+    }
 
-    LinkedList.prototype.last = function () {
+    last() {
         return this.tail;
-    };
+    }
 
-    LinkedList.prototype.toString = function () {
+    toString() {
         return this.toArray().toString();
-    };
+    }
 
-    LinkedList.prototype.toArray = function () {
-        var node = this.head,
-        result = [];
-        while (node !== null) {
+    toArray() {
+        const result = [];
+        for (const node of this) {
             result.push(node);
-            node = node.next;
         }
         return result;
-    };
+    }
 
-    // Note that modifying the list during
-    // iteration is not safe.
-    LinkedList.prototype.forEach = function (fun) {
-        var node = this.head;
-        while (node !== null) {
-            fun(node);
-            node = node.next;
+    // Note that modifying the list during iteration is not safe.
+    forEach(fn) {
+        for (const node of this) {
+            fn(node);
         }
-    };
+    }
 
-    LinkedList.prototype.contains = function (n) {
-        var node = this.head;
+    contains(n) {
         if (!this.isLinked(n)) {
             return false;
         }
-        while (node !== null) {
+        for (const node of this) {
             if (node === n) {
                 return true;
             }
-            node = node.next;
         }
         return false;
-    };
+    }
 
-    LinkedList.prototype.at = function (i) {
-        var node = this.head, index = 0;
-
+    at(i) {
         if (i >= this.listSize || i < 0) {
             return null;
         }
 
-        while (node !== null) {
+        let index = 0;
+        for (const node of this) {
             if (i === index) {
                 return node;
             }
-            node = node.next;
             index += 1;
         }
         return null;
-    };
+    }
 
-    LinkedList.prototype.insertAfter = function (node, newNode) {
+    insertAfter(node, newNode) {
         if (!this.isLinked(node)) {
             return this;
         }
@@ -112,9 +112,9 @@ Typeset.LinkedList = (function(undefined) {
         node.next = newNode;
         this.listSize += 1;
         return this;
-    };
+    }
 
-    LinkedList.prototype.insertBefore = function (node, newNode) {
+    insertBefore(node, newNode) {
         if (!this.isLinked(node)) {
             return this;
         }
@@ -128,18 +128,18 @@ Typeset.LinkedList = (function(undefined) {
         node.prev = newNode;
         this.listSize += 1;
         return this;
-    };
+    }
 
-    LinkedList.prototype.push = function (node) {
+    push(node) {
         if (this.head === null) {
             this.unshift(node);
         } else {
             this.insertAfter(this.tail, node);
         }
         return this;
-    };
+    }
 
-    LinkedList.prototype.unshift = function (node) {
+    unshift(node) {
         if (this.head === null) {
             this.head = node;
             this.tail = node;
@@ -150,9 +150,9 @@ Typeset.LinkedList = (function(undefined) {
             this.insertBefore(this.head, node);
         }
         return this;
-    };
+    }
 
-    LinkedList.prototype.remove = function (node) {
+    remove(node) {
         if (!this.isLinked(node)) {
             return this;
         }
@@ -168,13 +168,13 @@ Typeset.LinkedList = (function(undefined) {
         }
         this.listSize -= 1;
         return this;
-    };
+    }
 
-    LinkedList.prototype.pop = function () {
+    pop() {
         if (this.isEmpty()) {
             return null;
         }
-        var node = this.tail;
+        const node = this.tail;
         if (node.prev === null) {
             this.head = null;
             this.tail = null;
@@ -186,13 +186,13 @@ Typeset.LinkedList = (function(undefined) {
         node.prev = null;
         node.next = null;
         return node;
-    };
+    }
 
-    LinkedList.prototype.shift = function () {
+    shift() {
         if (this.isEmpty()) {
             return null;
         }
-        var node = this.head;
+        const node = this.head;
         if (node.next === null) {
             this.head = null;
             this.tail = null;
@@ -204,7 +204,8 @@ Typeset.LinkedList = (function(undefined) {
         node.prev = null;
         node.next = null;
         return node;
-    };
+    }
+}
 
-    return LinkedList;
-})();
+Typeset.LinkedList = LinkedList;
+Typeset.LinkedList.Node = LinkedListNode;
