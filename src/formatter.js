@@ -10,6 +10,10 @@
 Typeset.formatter = function (measureText, options) {
 	var linebreak = Typeset.linebreak;
 
+    function splitWords(text) {
+        return text.match(/\S+/g) || [];
+    }
+
     var spaceWidth = measureText(' '),
         o = {
             space: {
@@ -25,7 +29,7 @@ Typeset.formatter = function (measureText, options) {
     return {
         center: function (text) {
             var nodes = [],
-            words = text.split(/\s/),
+            words = splitWords(text),
             spaceStretch = (spaceWidth * o.space.width) / o.space.stretch,
             spaceShrink = (spaceWidth * o.space.width) / o.space.shrink;
 
@@ -63,7 +67,7 @@ Typeset.formatter = function (measureText, options) {
         },
         justify: function (text) {
             var nodes = [],
-            words = text.split(/\s/),
+            words = splitWords(text),
             spaceStretch = (spaceWidth * o.space.width) / o.space.stretch,
             spaceShrink = (spaceWidth * o.space.width) / o.space.shrink;
 
@@ -90,7 +94,7 @@ Typeset.formatter = function (measureText, options) {
         },
         left: function (text) {
             var nodes = [],
-            words = text.split(/\s/),
+            words = splitWords(text),
             spaceStretch = (spaceWidth * o.space.width) / o.space.stretch,
             spaceShrink = (spaceWidth * o.space.width) / o.space.shrink;
 

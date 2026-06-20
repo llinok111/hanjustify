@@ -23,7 +23,7 @@ jQuery(function ($) {
 		var nodes = format[type](text),
 			breaks = Typeset.linebreak(nodes, lineLengths, {tolerance: tolerance}),
 			lines = [],
-			i, point, r, lineStart,
+			i, point, r, lineStart = 0,
 			browserAssist = $(identifier).after('<ul></ul>'),
 			browserAssistRatio = $(identifier + ' + ul');
 
@@ -44,7 +44,7 @@ jQuery(function ($) {
 			lineStart = point;
 		}
 
-		lines = lines.map(function (line) {
+		lines.forEach(function (line) {
 			var spaceShrink = 1 / 9 * 12,
 				spaceStretch = 1 / 6 * 12,
 				ratio = line.ratio * (line.ratio < 0 ? spaceShrink : spaceStretch);

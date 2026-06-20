@@ -21,7 +21,10 @@ Typeset.LinkedList = (function(undefined) {
     };
 
     LinkedList.prototype.isLinked = function (node) {
-        return !((node && node.prev === null && node.next === null && this.tail !== node && this.head !== node) || this.isEmpty());
+        if (!node || this.isEmpty()) {
+            return false;
+        }
+        return !(node.prev === null && node.next === null && this.tail !== node && this.head !== node);
     };
 
     LinkedList.prototype.size = function () {
@@ -37,7 +40,7 @@ Typeset.LinkedList = (function(undefined) {
     };
 
     LinkedList.prototype.last = function () {
-        return this.last;
+        return this.tail;
     };
 
     LinkedList.prototype.toString = function () {
@@ -81,7 +84,7 @@ Typeset.LinkedList = (function(undefined) {
     LinkedList.prototype.at = function (i) {
         var node = this.head, index = 0;
 
-        if (i >= this.listLength || i < 0) {
+        if (i >= this.listSize || i < 0) {
             return null;
         }
 
@@ -168,9 +171,17 @@ Typeset.LinkedList = (function(undefined) {
     };
 
     LinkedList.prototype.pop = function () {
+        if (this.isEmpty()) {
+            return null;
+        }
         var node = this.tail;
-        this.tail.prev.next = null;
-        this.tail = this.tail.prev;
+        if (node.prev === null) {
+            this.head = null;
+            this.tail = null;
+        } else {
+            node.prev.next = null;
+            this.tail = node.prev;
+        }
         this.listSize -= 1;
         node.prev = null;
         node.next = null;
@@ -178,9 +189,17 @@ Typeset.LinkedList = (function(undefined) {
     };
 
     LinkedList.prototype.shift = function () {
+        if (this.isEmpty()) {
+            return null;
+        }
         var node = this.head;
-        this.head.next.prev = null;
-        this.head = this.head.next;
+        if (node.next === null) {
+            this.head = null;
+            this.tail = null;
+        } else {
+            node.next.prev = null;
+            this.head = node.next;
+        }
         this.listSize -= 1;
         node.prev = null;
         node.next = null;
