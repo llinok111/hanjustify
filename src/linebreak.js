@@ -18,19 +18,15 @@ Typeset.linebreak = (function() {
 			},
 			tolerance: settings && settings.tolerance || 2
 		},
-		activeNodes = new Typeset.LinkedList(),
-		sum = {
-			width: 0,
-			stretch: 0,
-			shrink: 0
-		},
 		lineLengths = lines,
-		breaks = [],
-		tmp = {
-			data: {
-				demerits: Infinity
-			}
-		};
+		startTolerance = settings && settings.tolerance || 2,
+		maxTolerance = settings && settings.maxTolerance !== undefined ?
+			settings.maxTolerance : startTolerance + 4,
+		tryTolerance,
+		activeNodes,
+		sum,
+		breaks,
+		tmp;
 
 		function breakpoint(position, demerits, ratio, line, fitnessClass, totals, previous) {
 			return {
@@ -46,6 +42,22 @@ Typeset.linebreak = (function() {
 				},
 				previous: previous
 			};
+		}
+
+		function isNonDiscardable(index) {
+			var prev = nodes[index - 1];
+			return prev.type === 'box' ||
+				(prev.type === 'penalty' && prev.penalty !== linebreak.infinity);
+		}
+
+		function isFeasibleRatio(ratio, finalLine) {
+			if (ratio < -1 || ratio === linebreak.infinity || !isFinite(ratio)) {
+				return false;
+			}
+			if (finalLine) {
+				return true;
+			}
+			return ratio <= options.tolerance;
 		}
 
 		function computeCost(start, end, active, currentLine) {
@@ -86,24 +98,21 @@ Typeset.linebreak = (function() {
 		}
 
 
-		// Add width, stretch and shrink values from the current
-		// break point up to the next box or forced penalty.
+		// Record cumulative width, stretch and shrink after breaking at the given node.
 		function computeSum(breakPointIndex) {
 			var result = {
 					width: sum.width,
 					stretch: sum.stretch,
 					shrink: sum.shrink
 				},
-				i = 0;
+				node = nodes[breakPointIndex];
 
-			for (i = breakPointIndex; i < nodes.length; i += 1) {
-				if (nodes[i].type === 'glue') {
-					result.width += nodes[i].width;
-					result.stretch += nodes[i].stretch;
-					result.shrink += nodes[i].shrink;
-				} else if (nodes[i].type === 'box' || (nodes[i].type === 'penalty' && nodes[i].penalty === -linebreak.infinity && i > breakPointIndex)) {
-					break;
-				}
+			if (node.type === 'glue') {
+				result.width += node.width;
+				result.stretch += node.stretch;
+				result.shrink += node.shrink;
+			} else if (node.type === 'penalty' && node.penalty !== linebreak.infinity) {
+				result.width += node.width;
 			}
 			return result;
 		}
@@ -121,7 +130,8 @@ Typeset.linebreak = (function() {
 				currentClass = 0,
 				fitnessClass,
 				candidate,
-				newNode;
+				newNode,
+				finalLine = node.type === 'penalty' && node.penalty === -linebreak.infinity;
 
 			// The inner loop iterates through all the active nodes with line < currentLine and then
 			// breaks out to insert the new active node candidates before looking at the next active
@@ -146,18 +156,14 @@ Typeset.linebreak = (function() {
 					currentLine = active.data.line + 1;
 					ratio = computeCost(active.data.position, index, active.data, currentLine);
 
-					// Deactive nodes when the distance between the current active node and the
-					// current node becomes too large (i.e. it exceeds the stretch limit and the stretch
-					// ratio becomes negative) or when the current node is a forced break (i.e. the end
-					// of the paragraph when we want to remove all active nodes, but possibly have a final
-					// candidate active node---if the paragraph can be set using the given tolerance value.)
-					if (ratio < -1 || (node.type === 'penalty' && node.penalty === -linebreak.infinity)) {
+					// Deactivate nodes when the line is too overfull to shrink.
+					if (ratio < -1) {
 						activeNodes.remove(active);
 					}
 
-					// If the ratio is within the valid range of -1 <= ratio <= tolerance calculate the
-					// total demerits and record a candidate active node.
-					if (-1 <= ratio && ratio <= options.tolerance) {
+					// If the ratio is feasible, calculate the total demerits and record a
+					// candidate active node.
+					if (isFeasibleRatio(ratio, finalLine)) {
 						badness = 100 * Math.pow(Math.abs(ratio), 3);
 
 						// Positive penalty
@@ -236,42 +242,66 @@ Typeset.linebreak = (function() {
 			}
 		}
 
-		// Add an active node for the start of the paragraph.
-		activeNodes.push(new Typeset.LinkedList.Node(breakpoint(0, 0, 0, 0, 0, undefined, null)));
-
-		nodes.forEach(function (node, index, nodes) {
-			if (node.type === 'box') {
-				sum.width += node.width;
-			} else if (node.type === 'glue') {
-				if (index > 0 && nodes[index - 1].type === 'box') {
-					mainLoop(node, index, nodes);
+		for (tryTolerance = startTolerance; tryTolerance <= maxTolerance; tryTolerance += 1) {
+			options.tolerance = tryTolerance;
+			activeNodes = new Typeset.LinkedList();
+			sum = {
+				width: 0,
+				stretch: 0,
+				shrink: 0
+			};
+			breaks = [];
+			tmp = {
+				data: {
+					demerits: Infinity
 				}
-				sum.width += node.width;
-				sum.stretch += node.stretch;
-				sum.shrink += node.shrink;
-			} else if (node.type === 'penalty' && node.penalty !== linebreak.infinity) {
-				mainLoop(node, index, nodes);
-			}
-		});
+			};
 
+			// Add an active node for the start of the paragraph.
+			activeNodes.push(new Typeset.LinkedList.Node(breakpoint(0, 0, 0, 0, 0, undefined, null)));
 
-		if (activeNodes.size() !== 0) {
-			// Find the best active node (the one with the least total demerits.)
-			activeNodes.forEach(function (node) {
-				if (node.data.demerits < tmp.data.demerits) {
-					tmp = node;
+			nodes.forEach(function (node, index, nodes) {
+				if (node.type === 'box') {
+					sum.width += node.width;
+				} else if (node.type === 'glue') {
+					if (index > 0 && isNonDiscardable(index)) {
+						mainLoop(node, index, nodes);
+					}
+					sum.width += node.width;
+					sum.stretch += node.stretch;
+					sum.shrink += node.shrink;
+				} else if (node.type === 'penalty' && node.penalty !== linebreak.infinity) {
+					mainLoop(node, index, nodes);
 				}
 			});
 
-			while (tmp !== null) {
-				breaks.push({
-					position: tmp.data.position,
-					ratio: tmp.data.ratio
+			if (activeNodes.size() !== 0) {
+				var maxPosition = 0;
+
+				// Find the best active node at the furthest breakpoint (the end of the paragraph.)
+				activeNodes.forEach(function (node) {
+					if (node.data.position > maxPosition) {
+						maxPosition = node.data.position;
+					}
 				});
-				tmp = tmp.data.previous;
+
+				activeNodes.forEach(function (node) {
+					if (node.data.position === maxPosition && node.data.demerits < tmp.data.demerits) {
+						tmp = node;
+					}
+				});
+
+				while (tmp !== null) {
+					breaks.push({
+						position: tmp.data.position,
+						ratio: tmp.data.ratio
+					});
+					tmp = tmp.data.previous;
+				}
+				return breaks.reverse();
 			}
-			return breaks.reverse();
 		}
+
 		return [];
 	};
 
