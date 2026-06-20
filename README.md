@@ -54,29 +54,29 @@ Using some basic math it is also possible to set text in circles or even arbitra
 
 The following are some extensions to the algorithm discussed in the original paper, which I intend to implement (at some point.)
 
-* [Hanging punctuation](http://en.wikipedia.org/wiki/Hanging_punctuation). The following quote from the original paper explains how to implement it using the box, glue and penalty model:
+- [Hanging punctuation](http://en.wikipedia.org/wiki/Hanging_punctuation). The following quote from the original paper explains how to implement it using the box, glue and penalty model:
 
-   > Some people prefer to have the right edge of their text look ‘solid’,
-   > by setting periods, commas, and other punctuation marks (including
-   > inserted hyphens) in the right-hand margin. For example, this practice
-   > is occasionally used in contemporary advertising.
+  > Some people prefer to have the right edge of their text look ‘solid’,
+  > by setting periods, commas, and other punctuation marks (including
+  > inserted hyphens) in the right-hand margin. For example, this practice
+  > is occasionally used in contemporary advertising.
 
-   > It is easy to get inserted hyphens into the margin: We simply let the
-   > width of the corresponding penalty item be zero. And it is almost as
-   > easy to do the same for periods and other symbols, by putting every such
-   > character in a box of width zero and adding the actual symbol width to
-   > the glue that follows. If no break occurs at this glue, the accumulated
-   > width is the same as before; and if a break does occur, the line will be
-   > justified as if the period or other symbol were not present.
+  > It is easy to get inserted hyphens into the margin: We simply let the
+  > width of the corresponding penalty item be zero. And it is almost as
+  > easy to do the same for periods and other symbols, by putting every such
+  > character in a box of width zero and adding the actual symbol width to
+  > the glue that follows. If no break occurs at this glue, the accumulated
+  > width is the same as before; and if a break does occur, the line will be
+  > justified as if the period or other symbol were not present.
 
-* Compare quality against line-breaking implemented by [Internet Explorer's `text-justify` CSS property](http://msdn.microsoft.com/en-us/library/ms534671%28VS.85%29.aspx).
-* Figure out how to deal with dynamic paragraphs (i.e. paragraphs being edited) as their ratios will change during editing and thus visibly move around.
+- Compare quality against line-breaking implemented by [Internet Explorer's `text-justify` CSS property](http://msdn.microsoft.com/en-us/library/ms534671%28VS.85%29.aspx).
+- Figure out how to deal with dynamic paragraphs (i.e. paragraphs being edited) as their ratios will change during editing and thus visibly move around.
 
 ### References
 
 These are the resources I found most useful while implementing the line breaking algorithm.
 
-* [Digital Typography, Donald E. Knuth](http://www.amazon.com/Digital-Typography-Center-Language-Information/dp/1575860104/)
-* [Breaking paragraphs into lines, Donald E. Knuth, Michael F. Plass](http://www3.interscience.wiley.com/journal/113445055/abstract)
-* [Knuth & Plass line-breaking Revisited](http://defoe.sourceforge.net/folio/knuth-plass.html)
-* [Wikipedia: Word wrap](http://en.wikipedia.org/w/index.php?title=Word_wrap)
+- [Digital Typography, Donald E. Knuth](http://www.amazon.com/Digital-Typography-Center-Language-Information/dp/1575860104/)
+- [Breaking paragraphs into lines, Donald E. Knuth, Michael F. Plass](https://onlinelibrary.wiley.com/doi/10.1002/spe.4380111102)
+- [Knuth & Plass line-breaking Revisited](http://defoe.sourceforge.net/folio/knuth-plass.html)
+- [Wikipedia: Word wrap](http://en.wikipedia.org/w/index.php?title=Word_wrap)
