@@ -6,7 +6,7 @@ Typeset.linebreak = (function () {
      * @preserve Knuth and Plass line breaking algorithm in JavaScript
      *
      * Licensed under the new BSD License.
-     * Copyright 2009-2010, Bram Stein
+     * Copyright 2009-2010, 2026 Bram Stein
      * All rights reserved.
      */
     const linebreak = function (nodes, lines, settings) {
@@ -88,7 +88,7 @@ Typeset.linebreak = (function () {
                 if (shrink > 0) {
                     return (lineLength - width) / shrink;
                 }
-                return linebreak.infinity;
+                return -linebreak.infinity;
             }
             return 0;
         }
