@@ -7,16 +7,20 @@ jQuery(function ($) {
 			display: 'inline',
 			left: '-8000px'
 		}),
-		format;
+		format,
+		lineWidth;
 
-	$('body').append(ruler);
+	$('#browser-assist').parent().append(ruler);
+	ruler.css('font', $('#browser-assist').css('font'));
 
 	format = Typeset.formatter(function (str) {
-		if (str !== ' ') {
-			return ruler.text(str).width();
-		} else {
-			return ruler.html('&nbsp;').width();
+		if (str === ' ') {
+			ruler.text('I am');
+			var withSpace = ruler.width();
+			ruler.text('Iam');
+			return withSpace - ruler.width();
 		}
+		return ruler.text(str).width();
 	});
 
 	function browserAssistTypeset(identifier, text, type, lineLengths, tolerance) {
@@ -26,6 +30,8 @@ jQuery(function ($) {
 			i, point, r, lineStart = 0,
 			browserAssist = $(identifier).after('<ul></ul>'),
 			browserAssistRatio = $(identifier + ' + ul');
+
+		lineWidth = lineLengths[0];
 
 		// Iterate through the line breaks, and split the nodes at the
 		// correct point.
@@ -44,16 +50,41 @@ jQuery(function ($) {
 			lineStart = point;
 		}
 
-		lines.forEach(function (line) {
-			var spaceShrink = 1 / 9 * 12,
-				spaceStretch = 1 / 6 * 12,
-				ratio = line.ratio * (line.ratio < 0 ? spaceShrink : spaceStretch);
+		lines.forEach(function (line, lineIndex, lineArray) {
+			var hyphenPenalty = 100,
+				words = [],
+				current = '',
+				lineText,
+				isLastLine = lineIndex === lineArray.length - 1,
+				gaps,
+				wordSpace = 0;
 
-			var output = '<span style="word-spacing: ' + ratio.toFixed(3) + 'px; display: inline-block; white-space: nowrap;">' + line.nodes.filter(function (n) {
-				return n.type === 'box';
-			}).map(function (n) {
-				return n.value;
-			}).join(' ') + '</span>';
+			line.nodes.forEach(function (n, index, array) {
+				if (n.type === 'box') {
+					current += n.value;
+				} else if (n.type === 'glue' && index !== array.length - 1) {
+					if (current) {
+						words.push(current);
+						current = '';
+					}
+				} else if (n.type === 'penalty' && n.penalty === hyphenPenalty && index === array.length - 1) {
+					current += '-';
+				}
+			});
+
+			if (current) {
+				words.push(current);
+			}
+
+			lineText = words.join(' ');
+			gaps = (lineText.match(/ /g) || []).length;
+
+			if (!isLastLine && gaps > 0) {
+				ruler.text(lineText);
+				wordSpace = (lineWidth - ruler.width()) / gaps;
+			}
+
+			var output = '<span style="display: block; white-space: nowrap; word-spacing: ' + wordSpace.toFixed(3) + 'px;">' + lineText + '</span>';
 			browserAssist.append(output);
 			browserAssistRatio.append('<li>' + line.ratio.toFixed(3) + '</li>');
 		});
