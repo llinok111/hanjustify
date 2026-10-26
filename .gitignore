@@ -1,6 +1,7 @@
-# Dependencies and build artefacts
+# Dependencies. `dist/` is intentionally NOT ignored: it is generated, but a fresh
+# clone has to be runnable without a build step (CI caught this when it was ignored --
+# the CLI could not start and the demo bundle could not resolve the kernel).
 node_modules/
-dist/
 
 # Local scratch space: probes, one-off experiments, screenshots.
 tmp/

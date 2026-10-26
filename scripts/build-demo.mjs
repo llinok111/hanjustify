@@ -13,12 +13,16 @@
 import { build } from 'esbuild';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { statSync } from 'node:fs';
+import { statSync, readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { buildKernel } from './build-kernel.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const outfile = join(root, 'demo/hanjustify.bundle.js');
+
+// The bundle imports `src/cjk/layout.mjs`, which imports `dist/kernel.mjs`. On a fresh
+// clone that file may not exist yet, so build it first rather than failing to resolve.
+buildKernel({ quiet: true });
 
 await build({
   entryPoints: [join(root, 'demo/entry.mjs')],

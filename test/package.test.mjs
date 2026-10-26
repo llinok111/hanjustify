@@ -98,11 +98,27 @@ test('the font module has no Node built-in dependencies', () => {
 test('the built kernel exists and exports the engine', async () => {
   const kernelPath = join(root, 'dist/kernel.mjs');
   if (!existsSync(kernelPath)) {
-    assert.fail('dist/kernel.mjs is missing; run `npm run build` before `npm test`');
+    assert.fail('dist/kernel.mjs is missing; run `npm run build` (it is committed so a fresh clone runs without building)');
   }
   const kernel = await import(pathToFileURL(kernelPath).href);
   assert.equal(typeof kernel.linebreak, 'function');
   assert.ok(kernel.KnuthLinkedList);
+});
+
+test('the committed kernel is exactly what the build script renders', async () => {
+  // dist/kernel.mjs is committed so a clone is runnable. That only stays honest if the
+  // file cannot drift from its inputs, so this regenerates it in memory and compares.
+  const { renderKernel } = await import(pathToFileURL(join(root, 'scripts/build-kernel.mjs')).href);
+  const onDisk = readFileSync(join(root, 'dist/kernel.mjs'), 'utf8');
+  assert.equal(onDisk, renderKernel(), 'dist/kernel.mjs is stale; run `npm run build` and commit the result');
+});
+
+test('dist is not gitignored', () => {
+  // CI caught the consequence of ignoring it: a fresh checkout could neither start the
+  // CLI nor resolve the kernel while bundling the demo.
+  const ignore = readFileSync(join(root, '.gitignore'), 'utf8');
+  const lines = ignore.split(/\r?\n/).map(l => l.trim());
+  assert.ok(!lines.includes('dist/') && !lines.includes('dist'), '.gitignore must not exclude dist/');
 });
 
 test('the demo bundle exists and is a module', () => {
