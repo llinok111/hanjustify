@@ -6,6 +6,7 @@ node_modules/
 # Local scratch space: probes, one-off experiments, screenshots.
 tmp/
 shots/
+_dist/
 .probe-browser/
 *.log
 
