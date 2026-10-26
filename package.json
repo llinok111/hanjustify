@@ -1,6 +1,6 @@
 {
   "name": "hanjustify",
-  "version": "2.0.0",
+  "version": "1.0.0",
   "description": "CJK-aware Knuth-Plass paragraph justification: UAX#14 segmentation, kinsoku (禁则) prohibition, punctuation compression and headless font metrics on top of the bramstein/typeset engine",
   "type": "module",
   "main": "dist/kernel.mjs",
