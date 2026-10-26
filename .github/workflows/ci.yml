@@ -1,0 +1,100 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Node ${{ matrix.node }} on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        # 18 is the declared `engines` floor. It must actually be exercised: this
+        # project was developed on Node 22 and 18/20-only features have bitten
+        # before, so the floor is a tested claim rather than a wish.
+        node: [18, 20, 22]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+
+      - name: Install
+        run: npm ci --no-audit --no-fund
+
+      # A YAML syntax error in a workflow makes GitHub fail the run in 0 seconds
+      # with no job logs at all, which is nearly impossible to diagnose from the
+      # outside. Parsing the files here turns that into a normal failure with a
+      # message. python3 ships on the ubuntu runner, so this needs no extra action.
+      - name: Validate workflow YAML
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          python3 - <<'PY'
+          import glob, sys, yaml
+          for f in sorted(glob.glob('.github/workflows/*.yml')):
+              try:
+                  doc = yaml.safe_load(open(f, encoding='utf-8'))
+              except Exception as exc:
+                  print(f'FAIL {f}: {exc}')
+                  sys.exit(1)
+              jobs = list((doc.get('jobs') or {}).keys())
+              if not jobs:
+                  print(f'FAIL {f}: no jobs parsed')
+                  sys.exit(1)
+              print(f'OK {f} jobs={jobs}')
+          PY
+
+      - name: Build kernel
+        run: node scripts/build-kernel.mjs
+
+      - name: Verify the upstream engine is unmodified
+        run: node --test test/upstream-parity.test.mjs
+
+      - name: Test
+        run: node scripts/test.mjs
+
+      - name: Baseline (upstream cannot set Chinese)
+        run: node scripts/baseline.mjs
+
+      - name: Audit gate
+        run: node bin/hanjustify.js audit --width 400 "他说：“这样可以。”然后就走了。（参见《中文排版需求》。）"
+
+      - name: CLI exit-code contract
+        shell: bash
+        run: |
+          set +e
+          node bin/hanjustify.js >/dev/null 2>&1; no_input=$?
+          node bin/hanjustify.js --bogus >/dev/null 2>&1; bad_flag=$?
+          node bin/hanjustify.js audit --width 400 "正常文本。" >/dev/null 2>&1; ok=$?
+          echo "no-input=$no_input bad-flag=$bad_flag audit-ok=$ok"
+          test "$no_input" = "1" || { echo "expected exit 1 for missing input"; exit 1; }
+          test "$bad_flag" = "1" || { echo "expected exit 1 for unknown flag"; exit 1; }
+          test "$ok" = "0" || { echo "expected exit 0 for a clean audit"; exit 1; }
+
+  demo-bundle:
+    name: Demo bundle is reproducible
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci --no-audit --no-fund
+      - name: Rebuild the bundle and compare
+        shell: bash
+        run: |
+          before=$(sha256sum demo/hanjustify.bundle.js | cut -d' ' -f1)
+          node scripts/build-demo.mjs
+          after=$(sha256sum demo/hanjustify.bundle.js | cut -d' ' -f1)
+          echo "before=$before"
+          echo "after=$after"
+          if [ "$before" != "$after" ]; then
+            echo "::error::demo/hanjustify.bundle.js is stale; run node scripts/build-demo.mjs"
+            exit 1
+          fi

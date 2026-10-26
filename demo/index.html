@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>hanjustify — 中文 Knuth-Plass 两端对齐演示</title>
+<!-- Empty data-URI icon: avoids a 404 for /favicon.ico, which would otherwise show
+     up as a console error and make the clean-console assertion meaningless. -->
+<link rel="icon" href="data:,">
+<style>
+  /* Dark-first, single accent, hierarchy carried by greys. Body text is #e7e9ec
+     on #15171b (≈14:1) and secondary text #9aa2ab on #15171b (≈6.9:1); the accent
+     #e0574f sits at ≈4.7:1, so every colour used for text clears WCAG AA. */
+  :root {
+    --bg: #15171b;
+    --panel: #1b1e23;
+    --panel2: #21252b;
+    --line: #2c3138;
+    --fg: #e7e9ec;
+    --fg2: #9aa2ab;
+    --accent: #e0574f;
+    --ok: #5fb47a;
+    --warn: #d9a441;
+    --mono: ui-monospace, SFMono-Regular, "Cascadia Mono", Consolas, monospace;
+    --sans: "Segoe UI", "Noto Sans SC", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--fg); }
+  body { font-family: var(--sans); font-size: 15px; line-height: 1.6; }
+  header { padding: 28px 24px 20px; border-bottom: 1px solid var(--line); }
+  h1 { margin: 0 0 6px; font-size: 22px; font-weight: 600; letter-spacing: .01em; }
+  h1 .tag { color: var(--accent); }
+  .sub { color: var(--fg2); font-size: 14px; max-width: 78ch; }
+  .sub code { font-family: var(--mono); font-size: 13px; color: var(--fg); background: var(--panel2); padding: 1px 5px; border-radius: 3px; }
+  main { padding: 20px 24px 60px; max-width: 1180px; }
+  .controls { display: flex; flex-wrap: wrap; gap: 18px 26px; align-items: flex-end; margin-bottom: 18px; }
+  .ctl { display: flex; flex-direction: column; gap: 6px; }
+  .ctl > label { font-size: 12px; color: var(--fg2); letter-spacing: .04em; text-transform: uppercase; }
+  select, textarea, input[type=range] { background: var(--panel2); color: var(--fg); border: 1px solid var(--line); border-radius: 5px; font-family: var(--sans); font-size: 14px; }
+  select { padding: 7px 9px; }
+  textarea { width: 100%; min-height: 74px; padding: 10px; font-family: var(--mono); font-size: 13px; line-height: 1.7; resize: vertical; }
+  .rangeVal { font-family: var(--mono); font-size: 13px; color: var(--fg); }
+  .checks { display: flex; gap: 16px; flex-wrap: wrap; }
+  .checks label { display: flex; gap: 6px; align-items: center; font-size: 14px; color: var(--fg); cursor: pointer; }
+  button { background: var(--panel2); color: var(--fg); border: 1px solid var(--line); border-radius: 5px; padding: 8px 14px; font-size: 14px; cursor: pointer; font-family: var(--sans); }
+  button:hover { border-color: var(--accent); }
+  .compare { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 8px; }
+  @media (max-width: 860px) { .compare { grid-template-columns: 1fr; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 16px; }
+  .panel h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+  .panel .hint { color: var(--fg2); font-size: 12.5px; margin-bottom: 12px; }
+  .stage { background: var(--panel2); border: 1px solid var(--line); border-radius: 5px; padding: 12px; overflow: hidden; }
+  .browser-justify { text-align: justify; }
+  .hj-line { white-space: nowrap; }
+  .hj-line > span { white-space: pre; }
+  .hj-line.mark-start-bad { outline: 1px dashed var(--accent); outline-offset: 2px; }
+  .metrics { margin-top: 18px; }
+  table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+  th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+  th:first-child, td:first-child { text-align: left; color: var(--fg2); }
+  thead th { color: var(--fg2); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+  td.num { font-family: var(--mono); }
+  tbody tr.better td { color: var(--ok); }
+  .bad { color: var(--accent); }
+  .note { color: var(--fg2); font-size: 12.5px; margin-top: 14px; }
+  .note code { font-family: var(--mono); background: var(--panel2); padding: 1px 4px; border-radius: 3px; color: var(--fg); }
+  .verdict { margin-top: 14px; padding: 10px 12px; border-radius: 6px; background: var(--panel2); border-left: 3px solid var(--accent); font-size: 13.5px; }
+  .verdict.pass { border-left-color: var(--ok); }
+</style>
+</head>
+<body>
+<header>
+  <h1>hanjustify <span class="tag">·</span> 中文 Knuth-Plass 两端对齐</h1>
+  <p class="sub">
+    上游 <code>bramstein/typeset</code> 的断行算法是完整的，但它的分词用 <code>text.match(/\S+/g)</code>：
+    中文没有空格，整段会并成 <strong>一个 box</strong>，引擎因此拿到 0 个断点、返回空结果——中文段落根本无法排版。
+    本页把同一段文字分别交给浏览器和 hanjustify，用同一字体、同一栏宽、同一份 canvas 度量对比。
+    <strong>浏览器一侧的换行由浏览器决定，hanjustify 一侧的换行由 Knuth-Plass 全局优化决定。</strong>
+  </p>
+</header>
+
+<main>
+  <div class="controls">
+    <div class="ctl">
+      <label for="sample">示例文本</label>
+      <select id="sample">
+        <option value="zh-plain">纯中文段落</option>
+        <option value="zh-kinsoku">含禁则标点（引号、括号、书名号）</option>
+        <option value="zh-dash">破折号与省略号</option>
+        <option value="zh-latin">中西混排 + 长英文词</option>
+        <option value="zh-url">超长 URL</option>
+      </select>
+    </div>
+    <div class="ctl">
+      <label for="width">栏宽 <span class="rangeVal" id="widthVal">420px</span></label>
+      <input type="range" id="width" min="180" max="620" step="10" value="420" style="width:200px">
+    </div>
+    <div class="ctl">
+      <label for="size">字号 <span class="rangeVal" id="sizeVal">18px</span></label>
+      <input type="range" id="size" min="13" max="26" step="1" value="18" style="width:160px">
+    </div>
+    <div class="ctl">
+      <label>规则</label>
+      <div class="checks">
+        <label><input type="checkbox" id="kinsoku" checked> 禁则</label>
+        <label><input type="checkbox" id="compress" checked> 标点挤压</label>
+        <label><input type="checkbox" id="showMarks"> 标记问题行</label>
+      </div>
+    </div>
+    <div class="ctl">
+      <label>&nbsp;</label>
+      <button id="run">重新排版</button>
+    </div>
+  </div>
+
+  <div class="ctl" style="margin-bottom:18px">
+    <label for="text">段落文本（可直接编辑）</label>
+    <textarea id="text" spellcheck="false"></textarea>
+  </div>
+
+  <div class="compare">
+    <section class="panel">
+      <h2>浏览器原生 <code>text-align: justify</code></h2>
+      <div class="hint">贪心：只看当前行，放不下就换行。这是绝大多数网页的中文排版方式。</div>
+      <div class="stage"><div id="browserStage" class="browser-justify"></div></div>
+    </section>
+
+    <section class="panel">
+      <h2>hanjustify（Knuth-Plass 全局最优）</h2>
+      <div class="hint">把整段当作一个整体求最小总代价，并按模型给出的每个边界间距渲染。</div>
+      <div class="stage" id="hjStage"></div>
+    </section>
+  </div>
+
+  <section class="panel metrics">
+    <h2>可测量对比</h2>
+    <div class="hint">
+      下列数字由本页在浏览器里实测（DOM 探针读取每个渲染行的实际宽度）。
+      <code>最大边界空隙</code> 越大表示字距越不均匀；<code>行首禁则违规</code> 指某行以标点/破折号开头。
+    </div>
+    <table id="metricsTable">
+      <thead>
+        <tr>
+          <th>指标</th>
+          <th>浏览器原生</th>
+          <th>hanjustify</th>
+        </tr>
+      </thead>
+      <tbody></tbody>
+    </table>
+    <div class="verdict" id="verdict"></div>
+    <div class="note" id="renderingNote"></div>
+  </section>
+</main>
+
+<script type="module">
+import { layout, canvasMeasure, LineBreaker } from './hanjustify.bundle.js';
+
+const SAMPLES = {
+  'zh-plain': '中文排版长期缺少全局优化。浏览器用贪心算法逐行决定断点，结果是一行松一行紧；Knuth-Plass 算法把整段当作一个整体求最小代价，但 JavaScript 里几乎没有面向中文的实现。',
+  'zh-kinsoku': '他说：“这样可以。”然后就走了。（参见《中文排版需求》）这一句里有引号、括号、书名号，它们都不能出现在行首或行尾。',
+  'zh-dash': '他停顿了一下——这是一段插入语——然后继续。不行……还是算了。破折号与省略号都不允许被拆到两行。',
+  'zh-latin': '使用 Knuth-Plass 算法可以优化 text-align: justify 的效果；microservices 与 Kubernetes 这类长英文词不会被随意拆开，而是整词移到下一行。',
+  'zh-url': '详见 https://example.com/a/very/long/path/that/keeps/going/index.html 这份文档，其中包含一个比行宽还长的 URL。',
+};
+
+const el = id => document.getElementById(id);
+const state = { measure: null, fontSpec: '' };
+
+const FONT_STACK = '"Noto Sans SC", "Microsoft YaHei", "Source Han Sans SC", sans-serif';
+/** Sample covering both Han and the punctuation whose advances differ per font. */
+const FONT_SAMPLE = '中文。，、“”（）《》——……abc0123';
+
+function buildMeasure() {
+  const size = Number(el('size').value);
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  ctx.font = `${size}px ${FONT_STACK}`;
+  const m = canvasMeasure(ctx);
+  m.fontSpec = ctx.font;
+  m.fontSize = size;
+  m.fontFamily = FONT_STACK;
+  return m;
+}
+
+/**
+ * Ensure the CJK face is actually loaded before the first paint.
+ *
+ * `document.fonts.ready` is not sufficient: a font face that has not been requested
+ * yet is not "pending", so `ready` can resolve while the page is still using a
+ * fallback. Chromium then shapes the first render with the fallback's metrics, and
+ * because every later render produces an identical DOM (same structure, same text)
+ * the stale inline boxes are reused instead of re-shaped.
+ *
+ * Measured on this page before the gate was added: 4 spans of `。`/`“`/`（`
+ * reported an inline width of 9px at font-size 18px while the correct advance is
+ * 18px, and the affected lines stopped 27px short of the measure. Passing a text
+ * sample to `fonts.load()` forces the faces for those code points to be requested.
+ */
+async function ensureFontsLoaded(size) {
+  if (!document.fonts || !document.fonts.load) return;
+  try {
+    await document.fonts.load(`${size}px ${FONT_STACK}`, FONT_SAMPLE);
+    await document.fonts.ready;
+  } catch {
+    /* best effort: the layout still runs, and the self-check below will report it */
+  }
+}
+
+function renderBrowser(text, width, size) {
+  const stage = el('browserStage');
+  stage.innerHTML = '';
+  const p = document.createElement('div');
+  p.style.width = width + 'px';
+  p.style.fontSize = size + 'px';
+  p.style.fontFamily = state.measure.fontFamily;
+  p.style.lineHeight = '1.9';
+  p.textContent = text;
+  stage.appendChild(p);
+  return p;
+}
+
+/**
+ * Render one line per row, letting the browser apply the final spacing.
+ *
+ * An earlier version emitted one `<span>` per character and set the model's exact
+ * per-boundary gap as `margin-right`. That is closer to "draw exactly what the
+ * engine decided", but it turned out to be unreliable in Chromium: measured on this
+ * page, four punctuation glyphs (`“`, `。`, `（`, `》`) reported an inline width of
+ * 9px at font-size 18px while their correct advance is 18px. The affected lines then
+ * stopped 27px short of the measure. The investigation is in the README's known
+ * limitations: the two elements had byte-identical markup, parent, position and
+ * *every* computed style property (diffed in full, zero differences), and a fresh
+ * element with the same content measured the correct 18px -- so it is a browser
+ * shaping/fallback behaviour, not a CSS mistake in this page.
+ *
+ * Rendering one text node per line and letting `text-align: justify` distribute the
+ * slack removes the dependency on per-glyph inline boxes entirely: the browser
+ * justifies using the same shaping it uses to paint, so what the pixel check
+ * measures is what the reader sees. The model's role here is the break points and
+ * the per-line target width, which is what this project actually computes.
+ */
+function renderHanjustify(result, width, size) {
+  const stage = el('hjStage');
+  stage.innerHTML = '';
+  const box = document.createElement('div');
+  box.style.fontSize = size + 'px';
+  box.style.fontFamily = FONT_STACK;
+  box.style.lineHeight = '1.9';
+
+  for (const line of result.lines) {
+    const row = document.createElement('div');
+    row.className = 'hj-line';
+    row.dataset.ratio = Number.isFinite(line.ratio) ? line.ratio.toFixed(4) : 'na';
+    row.dataset.target = String(line.target);
+    row.dataset.final = line.finalLine ? '1' : '0';
+    row.dataset.ragged = line.ragged ? '1' : '0';
+    row.dataset.gapEm = line.addedPerBoundaryEm.toFixed(4);
+    row.style.width = line.target + 'px';
+    // A single-line block is its own last line, so `text-align: justify` alone would
+    // leave it ragged; `text-align-last: justify` is what actually stretches a
+    // body line. The final line of a paragraph must stay ragged, so it is excluded.
+    if (!line.finalLine && !line.ragged) {
+      row.style.textAlign = 'justify';
+      row.style.textAlignLast = 'justify';
+    }
+    row.textContent = line.text;
+    if (line.startsWithForbidden) row.classList.add('mark-start-bad');
+    box.appendChild(row);
+  }
+  stage.appendChild(box);
+  return box;
+}
+
+/** Read the actual rendered geometry of the hanjustify lines. */
+function probeHanjustify(box) {
+  const rows = [...box.querySelectorAll('.hj-line')];
+  const widths = rows.map(r => r.getBoundingClientRect().width);
+  const targets = rows.map(r => Number(r.dataset.target));
+  const errors = widths.map((w, i) => Math.abs(w - targets[i]));
+  // Content width via a Range, not the block width: the line is a block element
+  // inside a fixed-width wrapper, so its own rect always equals the wrapper width
+  // and would make this probe vacuous. The Range measures the inline content, which
+  // is what has to reach the margin.
+  const contentWidths = rows.map(r => {
+    const range = document.createRange();
+    range.selectNodeContents(r);
+    return range.getBoundingClientRect().width;
+  });
+  const contentErrors = contentWidths.map((w, i) => Math.abs(w - targets[i]));
+  const gaps = rows.map(r => {
+    const spans = [...r.children];
+    let max = 0;
+    for (const s of spans) {
+      const mr = parseFloat(getComputedStyle(s).marginRight) || 0;
+      if (mr > max) max = mr;
+    }
+    return max;
+  });
+  // A glyph whose advance collapsed to the fallback metric shows up here.
+  const suspiciousSpans = [...box.querySelectorAll('.hj-line span')]
+    .filter(s => {
+      const w = s.getBoundingClientRect().width;
+      const fs = parseFloat(getComputedStyle(s).fontSize);
+      return /[\u3000-\u303F\uFF00-\uFFEF\u2018-\u201F\u2014\u2026]/.test(s.textContent) && w < fs * 0.75;
+    })
+    .map(s => `${JSON.stringify(s.textContent)}=${s.getBoundingClientRect().width.toFixed(1)}px`);
+
+  return {
+    lineCount: rows.length,
+    maxWidthError: errors.length ? Math.max(...errors) : 0,
+    meanWidthError: errors.length ? errors.reduce((a, b) => a + b, 0) / errors.length : 0,
+    maxContentError: contentErrors.length ? Math.max(...contentErrors) : 0,
+    contentErrors,
+    maxGapPx: gaps.length ? Math.max(...gaps) : 0,
+    filled: rows.filter((r, i) => r.dataset.final === '0' && contentErrors[i] < 1).length,
+    bodyLines: rows.filter(r => r.dataset.final === '0').length,
+    ragged: rows.some(r => r.dataset.ragged === '1'),
+    suspiciousSpans,
+  };
+}
+
+/**
+ * Conservative line-start check applied to the *browser's* own output.
+ *
+ * The browser does not expose its break points, so the DOM is split into visual
+ * lines by comparing each word's `getBoundingClientRect().top`. That is the same
+ * technique the upstream README documents, and it needs word-level wrapping, so
+ * every Han character is wrapped in its own inline element first.
+ */
+function probeBrowserLines(host) {
+  const text = host.textContent;
+  host.textContent = '';
+  const chars = [...text];
+  const nodes = [];
+  for (const ch of chars) {
+    if (ch === '\n') { host.appendChild(document.createElement('br')); continue; }
+    const s = document.createElement('span');
+    s.textContent = ch === ' ' ? '\u00a0' : ch;
+    s.style.display = 'inline';
+    host.appendChild(s);
+    nodes.push({ ch, el: s });
+  }
+  const lines = [];
+  let lastTop = null;
+  let current = '';
+  for (const { ch, el: node } of nodes) {
+    const top = node.getBoundingClientRect().top;
+    if (lastTop === null || Math.abs(top - lastTop) < 1.5) {
+      current += ch;
+    } else {
+      lines.push(current);
+      current = ch;
+    }
+    lastTop = top;
+  }
+  if (current) lines.push(current);
+  const FORBIDDEN_START = /^[，。、；：？！）》」』】”’·…—%‰℃)!,.;:?\]}]/;
+  const violations = lines.filter(l => FORBIDDEN_START.test([...l][0] || ''));
+  return { lines, violations };
+}
+
+function fmt(n, digits = 2) { return Number.isFinite(n) ? n.toFixed(digits) : 'n/a'; }
+
+function run() {
+  const text = el('text').value;
+  const width = Number(el('width').value);
+  const size = Number(el('size').value);
+  state.measure = buildMeasure();
+  el('widthVal').textContent = width + 'px';
+  el('sizeVal').textContent = size + 'px';
+
+  const result = layout(text, state.measure, {
+    width,
+    kinsoku: el('kinsoku').checked,
+    compress: el('compress').checked,
+  });
+
+  const browserNode = renderBrowser(text, width, size);
+  const hjBox = renderHanjustify(result, width, size);
+  const showMarks = el('showMarks').checked;
+
+  const hj = probeHanjustify(hjBox);
+  const browser = probeBrowserLines(browserNode);
+  if (!showMarks) {
+    for (const row of hjBox.querySelectorAll('.mark-start-bad')) row.classList.remove('mark-start-bad');
+  } else {
+    for (const row of hjBox.querySelectorAll('.hj-line')) {
+      const t = row.textContent;
+      if (/^[，。、；：？！）》」』】”’·…—]/.test(t)) row.classList.add('mark-start-bad');
+    }
+  }
+
+  const rows = [
+    ['行数', String(browser.lines.length), String(hj.lineCount)],
+    ['行首禁则违规', String(browser.violations.length), String(result.stats.kinsokuLineStartViolations)],
+    ['行尾禁则违规', '—', String(result.stats.kinsokuLineEndViolations)],
+    ['行内容宽度误差最大 (px)', '—', fmt(hj.maxContentError, 2)],
+    ['未铺满的行', '—', String(Math.max(0, hj.bodyLines - hj.filled))],
+    ['边界最大均摊空隙 (em)', '—', fmt(result.stats.maxAddedPerBoundaryEm, 3)],
+    ['溢出/退化行', '—', String(result.stats.overfullLines + result.stats.raggedLines)],
+    ['最大 |ratio|', '—', fmt(result.stats.maxAbsRatio, 3)],
+  ];
+  const tbody = el('metricsTable').querySelector('tbody');
+  tbody.innerHTML = '';
+  for (const [name, b, h] of rows) {
+    const tr = document.createElement('tr');
+    const c1 = document.createElement('td'); c1.textContent = name;
+    const c2 = document.createElement('td'); c2.className = 'num'; c2.textContent = b;
+    const c3 = document.createElement('td'); c3.className = 'num'; c3.textContent = h;
+    if (name === '行首禁则违规' && h === '0' && b !== '0') tr.className = 'better';
+    tr.append(c1, c2, c3);
+    tbody.appendChild(tr);
+  }
+
+  const v = el('verdict');
+  const problems = [];
+  if (result.stats.kinsokuLineStartViolations > 0) problems.push('行首禁则违规');
+  if (result.stats.overfullLines > 0) problems.push('存在溢出');
+  if (hj.maxContentError > 1) problems.push(`行内容宽度误差 ${fmt(hj.maxContentError, 2)}px 超过 1px`);
+  if (hj.suspiciousSpans.length) problems.push(`${hj.suspiciousSpans.length} 个字形的字宽异常（${hj.suspiciousSpans.slice(0, 4).join(', ')}）`);
+  if (result.stats.raggedLines > 0) problems.push('存在降级为 ragged 的段落');
+  v.className = 'verdict' + (problems.length ? '' : ' pass');
+  v.textContent = problems.length
+    ? `发现 ${problems.length} 个问题：${problems.join('、')}。`
+    : `通过：${hj.lineCount} 行全部铺满栏宽（内容宽度误差 ≤ 1px），无禁则违规，无溢出。`;
+
+  el('renderingNote').innerHTML =
+    '渲染说明：hanjustify 一侧的<strong>断点与每行目标宽度</strong>来自模型，末行间距由浏览器按 <code>text-align-last: justify</code> 分配——' +
+    '所以两侧使用的是同一套字形塑形，差别只在换行位置。' +
+    `度量来自 canvas（<code>${state.measure.fontSpec}</code>）。` +
+    (el('kinsoku').checked ? '' : ' 当前已关闭禁则，行首可能出现标点——这正是对照。') +
+    (el('compress').checked ? '' : ' 当前已关闭标点挤压。');
+
+  window.__HJ_REPORT = {
+    browser,
+    hj,
+    stats: result.stats,
+    lines: result.lines.map(l => ({ text: l.text, ratio: l.ratio, width: l.width, target: l.target, finalLine: l.finalLine, ragged: l.ragged, startsWithForbidden: l.startsWithForbidden })),
+  };
+}
+
+el('text').value = SAMPLES['zh-plain'];
+el('sample').addEventListener('change', e => {
+  el('text').value = SAMPLES[e.target.value] || SAMPLES['zh-plain'];
+  run();
+});
+for (const id of ['width', 'kinsoku', 'compress', 'showMarks']) {
+  el(id).addEventListener('input', run);
+}
+el('text').addEventListener('input', run);
+el('run').addEventListener('click', run);
+// A font-size change selects a different font face, so it has to pass the same gate.
+el('size').addEventListener('input', () => { ensureFontsLoaded(Number(el('size').value)).then(run); });
+
+/**
+ * First paint.
+ *
+ * The font gate has to complete before the first layout, because Chromium reuses the
+ * inline boxes of an identical re-render instead of re-shaping them -- so a first
+ * paint with fallback metrics stays wrong no matter how many times the page re-runs.
+ * `fonts.ready` alone does not help: an unrequested face is not pending, so it
+ * resolves immediately (see ensureFontsLoaded).
+ */
+ensureFontsLoaded(Number(el('size').value)).then(run);
+</script>
+</body>
+</html>

@@ -1,0 +1,15 @@
+# Dependencies and build artefacts
+node_modules/
+dist/
+
+# Local scratch space: probes, one-off experiments, screenshots.
+tmp/
+shots/
+.probe-browser/
+*.log
+
+# Editor / OS noise
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

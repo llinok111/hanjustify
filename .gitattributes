@@ -1,0 +1,13 @@
+# Upstream (bramstein/typeset) stores every text file as LF in the git index.
+# Windows checkouts with core.autocrlf=true would otherwise rewrite the working
+# tree to CRLF and make every untouched upstream file look modified, which would
+# break the "upstream engine is byte-identical" guarantee this project relies on.
+* text=auto eol=lf
+
+# Binary assets: never touch.
+*.png binary
+*.jpg binary
+*.gif binary
+*.woff2 binary
+*.ttf binary
+*.zip binary

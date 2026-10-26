@@ -1,0 +1,51 @@
+{
+  "name": "hanjustify",
+  "version": "2.0.0",
+  "description": "CJK-aware Knuth-Plass paragraph justification: UAX#14 segmentation, kinsoku (禁则) prohibition, punctuation compression and headless font metrics on top of the bramstein/typeset engine",
+  "type": "module",
+  "main": "dist/kernel.mjs",
+  "exports": {
+    ".": "./dist/kernel.mjs"
+  },
+  "bin": {
+    "hanjustify": "bin/hanjustify.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "build": "node scripts/build-kernel.mjs",
+    "test": "node scripts/build-kernel.mjs && node scripts/test.mjs",
+    "test:upstream": "node scripts/build-kernel.mjs && node --test test/upstream-parity.test.mjs",
+    "baseline": "node scripts/baseline.mjs",
+    "build:demo": "node scripts/build-demo.mjs",
+    "verify:demo": "node scripts/build-demo.mjs && node scripts/verify-demo.mjs",
+    "audit": "node bin/hanjustify.js audit",
+    "baseline:json": "node scripts/baseline.mjs --json"
+  },
+  "keywords": [
+    "cjk",
+    "chinese",
+    "typography",
+    "knuth-plass",
+    "justification",
+    "line-breaking",
+    "kinsoku",
+    "uax14"
+  ],
+  "license": "BSD-2-Clause",
+  "files": [
+    "bin",
+    "dist",
+    "src",
+    "LICENSE",
+    "NOTICE",
+    "README.md"
+  ],
+  "dependencies": {
+    "linebreak": "^1.1.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}
